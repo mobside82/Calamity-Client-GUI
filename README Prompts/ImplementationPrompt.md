@@ -47,3 +47,4 @@ Styling details:
 
 Output format: 
 Provide the complete code in a single `index.html` file (with embedded CSS and JavaScript). Ensure it is self-contained.
+Do NOT use React, Vite, or any framework. This UI runs inside JavaFX WebKit, which does not support modern React features. Rewrite everything as a SINGLE self-contained index.html file with embedded vanilla JavaScript and CSS3 only. No build step, no npm, no modules. Use plain DOM manipulation and a global appState object as specified in the original prompt.
