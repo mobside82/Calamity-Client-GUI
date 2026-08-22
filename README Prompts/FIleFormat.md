@@ -3,9 +3,10 @@
 
 You are an expert frontend developer specializing in legacy-compatible web interfaces. Create a single-page application that replicates the "Prestige Client" aesthetic. 
 
+Generate a MULTI-FILE vanilla JS/CSS project with this exact structure: index.html, css/styles.css, js/state.js, js/bridge.js, js/utils.js, and assets/ folder. All references must use RELATIVE paths. No ES modules, no imports/exports, no build tools. Scripts share global scope via window.
+
 CRITICAL CONSTRAINTS (DO NOT IGNORE):
 1. NO FRAMEWORKS: Do NOT use React, Vue, Svelte, Vite, Webpack, or any build tools. Output RAW HTML, CSS, and JavaScript only.
-2. SINGLE FILE OUTPUT: Provide everything in one self-contained `index.html` file with embedded `<style>` and `<script>` tags.
 3. JAVAFX WEBKIT COMPATIBILITY: The target runtime is an older WebKit engine. 
    - DO NOT use `ResizeObserver`, `IntersectionObserver`, or `MutationObserver`.
    - DO NOT use CSS Container Queries, `:has()`, or modern `gap` in flexbox.
@@ -13,13 +14,6 @@ CRITICAL CONSTRAINTS (DO NOT IGNORE):
    - DO use standard CSS3 Flexbox/Grid, CSS Variables, and vanilla DOM APIs (`document.createElement`, `addEventListener`).
 4. FIXED VIEWPORT: Design exclusively for 1280x720 pixels. No responsive breakpoints needed.
 5. NO KEYBOARD LISTENERS FOR KEYBINDS: The WebView will not receive focus. Keybind capture is handled externally by Java. Do NOT add `keydown` listeners for binding keys.
-
-DESIGN SPECIFICATIONS:
-- Theme: Dark background (#0a0a0a), neon cyan accents (#00e5ff), font 'Inter' (fallback: system-ui, sans-serif).
-- Layout:
-  * Left Sidebar (240px fixed): Header ("Prestige Client" + "RELEASE" badge), category list (Combat, Mace, Misc, Movement, Spear, Visual), bottom settings placeholder.
-  * Main Panel: Top bar (title, module count, search input), scrollable grid of module cards (name, description, animated toggle switch).
-  * Detail Panel: Slides in from right on module click. Contains back button, module info, "Bind" button, sliders, checkboxes. Semi-transparent backdrop when active.
 
 STATE MANAGEMENT:
 - Use a single global `window.appState` object.
@@ -74,11 +68,7 @@ INTERACTION FLOW:
 4. User adjusts slider → Calls `java_bridge_callback.updateModuleSetting(id, key, value)`
 
 STYLING DETAILS:
-- Animated toggle: Sliding pill with cyan fill when active.
 - Smooth transitions on detail panel slide-in (transform + opacity).
 - Hover states on all interactive elements.
 - Custom scrollbar styling for module list.
 - All colors defined as CSS variables for easy theming.
-
-OUTPUT REQUIREMENT:
-Provide ONE complete `index.html` file. No external dependencies. No build step. Must work when opened directly in Chrome AND when served via localhost to JavaFX WebView. Test all interactions in-browser using the dummy bridge before delivery.

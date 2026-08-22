@@ -4,7 +4,7 @@ Copy almost exactly from the images using this text as instructions on what to i
 ## Layout
 
 **Left Sidebar** (fixed, ~200px wide, always visible, background: `#111713`):
-- Top: CalamityCover.png icon + "Calamity Client" title + "Beta Version 0.0.1" subtitle
+- Top: logo.png icon + "Calamity Client" title + "Beta Version 0.0.1" subtitle
 - **MODULES** section: Category buttons - Combat (x), Mace (x), Misc (x), Movement (x), Spear (x), Visual (x). Each shows an icon, name, and module count (x).
 - **GENERAL** section: Settings, Theme, Configs, Socials, Keybinds. Each with an icon.
 - Active item has a mint-green-tinted background highlight (`#293831`).
