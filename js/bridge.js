@@ -31,26 +31,76 @@
     startKeybindCapture: function (id) {
       console.log("[Bridge] Capturing keybind for " + id);
       window.pendingKeybindModuleId = id;
-      // Simulate Java sending a keypress back after a short delay.
-      setTimeout(function () {
-        if (window.pendingKeybindModuleId === id && window.updateKeybind) {
-          window.updateKeybind(id, 82); // 82 = 'R'
-        }
-      }, 2000);
+      // In production Java captures the physical key and calls updateKeybind.
+      // In the browser preview we listen for the next keypress ourselves so a
+      // bind can be set and saved without the Java host.
+      captureBrowserKey(id);
     }
   };
 
+  // Translate a browser KeyboardEvent into the same readable names Java sends.
+  function eventToKeyName(ev) {
+    var code = ev.code || "";
+    if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+    if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+    if (/^Numpad[0-9]$/.test(code)) return "Num " + code.slice(6);
+    if (/^F([1-9]|1[0-2])$/.test(code)) return code;
+    var named = {
+      ControlLeft: "Ctrl", ControlRight: "Ctrl", ShiftLeft: "Shift",
+      ShiftRight: "Shift", AltLeft: "Alt", AltRight: "Alt", Space: "Space",
+      Enter: "Enter", Tab: "Tab", Backspace: "Backspace", Escape: "Esc",
+      ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right"
+    };
+    if (named[code]) return named[code];
+    if (ev.key && ev.key.length === 1) return ev.key.toUpperCase();
+    return ev.key || ("Key_" + (ev.keyCode || 0));
+  }
+
+  function captureBrowserKey(id) {
+    function onKey(ev) {
+      if (window.pendingKeybindModuleId !== id) {
+        document.removeEventListener("keydown", onKey, true);
+        return;
+      }
+      ev.preventDefault();
+      ev.stopPropagation();
+      document.removeEventListener("keydown", onKey, true);
+      if (ev.code === "Escape" || ev.key === "Escape") {
+        // Cancel the capture without changing the bind.
+        window.pendingKeybindModuleId = null;
+        if (typeof window.rerender === "function") window.rerender();
+        return;
+      }
+      if (ev.key === "Backspace" || ev.key === "Delete" || ev.code === "Backspace" || ev.code === "Delete") {
+        // Clear the current bind.
+        var mod = window.getModule(id);
+        if (mod) {
+          mod.bind.key = "None";
+          mod.bind.mode = "None";
+          window.java_bridge_callback.updateModuleSetting(id, "bindKey", "None");
+        }
+        window.pendingKeybindModuleId = null;
+        if (typeof window.rerender === "function") window.rerender();
+        return;
+      }
+      window.updateKeybind(id, null, eventToKeyName(ev));
+    }
+    document.addEventListener("keydown", onKey, true);
+  }
+
   // Global entry point Java invokes once it captures a physical key.
-  window.updateKeybind = function (moduleId, keyCode) {
-    var keyName = keyCodeToName(keyCode);
-    console.log("[UI] Keybind updated: " + moduleId + " -> " + keyName + " (" + keyCode + ")");
+  // keyName is optional; when omitted the numeric keyCode is translated.
+  window.updateKeybind = function (moduleId, keyCode, keyName) {
+    var name = keyName || keyCodeToName(keyCode);
+    console.log("[UI] Keybind updated: " + moduleId + " -> " + name);
     var mod = window.getModule(moduleId);
     if (!mod) return;
-    mod.bind.key = keyName;
+    mod.bind.key = name;
     if (mod.bind.mode === "None") mod.bind.mode = "Toggle";
     window.pendingKeybindModuleId = null;
     if (typeof window.rerender === "function") window.rerender();
   };
 
   window.keyCodeToName = keyCodeToName;
+  window.eventToKeyName = eventToKeyName;
 })();
