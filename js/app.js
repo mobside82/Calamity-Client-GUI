@@ -153,7 +153,10 @@
 
     var card = el("div.module-card" + (grid ? ".grid" : "") + (m.enabled ? ".on" : ""), {
       oncontextmenu: openSettings,
-      onclick: function () { toggleModule(m); }
+      onclick: function (ev) {
+        if (ev.target.closest(".module-info")) return;
+        toggleModule(m);
+      }
     }, [
       el("div.module-info", {}, [
         el("div.module-name", { text: m.name }),
