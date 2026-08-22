@@ -36,6 +36,12 @@
         el("div.brand-sub", { text: "Beta Version 0.0.1" })
       ])
     ]);
+    brand.style.cursor = "pointer";
+    brand.addEventListener("click", function () {
+      state.view = "brand";
+      state.selectedModuleId = null;
+      rerender();
+    });
 
     var modItems = state.categories.map(function (cat) {
       var active = state.view === "category" && state.currentCategory === cat.id;
@@ -88,6 +94,7 @@
     switch (state.view) {
       case "category": body = renderCategoryPage(); break;
       case "module": body = renderModulePage(); break;
+      case "brand": body = renderBrandPage(); break;
       case "configs": body = renderConfigsPage(); break;
       case "keybinds": body = renderKeybindsPage(); break;
       case "settings": body = renderGeneralPage("Settings", "Client preferences and general options."); break;
@@ -193,8 +200,29 @@
     var panel = el("div.search-panel", {});
     panel.style.display = "none";
 
+    var bestMatch = null;
+
+    function selectResult(m) {
+      state.search = "";
+      state.searchOpen = false;
+      state.view = "module";
+      state.selectedModuleId = m.id;
+      state.currentCategory = m.category;
+      rerender();
+    }
+
+    // Rank a module against the query: exact prefix beats a later match, and
+    // shorter names win ties (so "Ai" prefers "Aim Assist").
+    function scoreOf(name, q) {
+      var lower = name.toLowerCase();
+      var idx = lower.indexOf(q);
+      if (idx === -1) return Infinity;
+      return (idx === 0 ? 0 : 1000) + idx * 10 + lower.length * 0.01;
+    }
+
     function updatePanel() {
       window.clearNode(panel);
+      bestMatch = null;
       var q = state.search.trim().toLowerCase();
       if (!q) {
         panel.appendChild(el("div.search-empty", {}, [
@@ -204,9 +232,12 @@
         return;
       }
       var groups = {};
+      var bestScore = Infinity;
       state.modules.forEach(function (m) {
         if (m.name.toLowerCase().indexOf(q) !== -1) {
           (groups[m.categoryName] = groups[m.categoryName] || []).push(m);
+          var s = scoreOf(m.name, q);
+          if (s < bestScore) { bestScore = s; bestMatch = m; }
         }
       });
       var names = Object.keys(groups);
@@ -217,18 +248,14 @@
       names.forEach(function (catName) {
         panel.appendChild(el("div.search-group-label", { text: catName }));
         groups[catName].forEach(function (m) {
-          var row = el("div.search-result", {}, [
+          var isBest = bestMatch && m.id === bestMatch.id;
+          var row = el("div.search-result" + (isBest ? ".highlight" : ""), {}, [
             el("span.sr-name", { text: m.name }),
             el("span.sr-cat", { text: m.categoryName })
           ]);
           row.addEventListener("mousedown", function (ev) {
             ev.preventDefault();
-            state.search = "";
-            state.searchOpen = false;
-            state.view = "module";
-            state.selectedModuleId = m.id;
-            state.currentCategory = m.category;
-            rerender();
+            selectResult(m);
           });
           panel.appendChild(row);
         });
@@ -245,6 +272,12 @@
     input.addEventListener("input", function () {
       state.search = input.value;
       updatePanel();
+    });
+    input.addEventListener("keydown", function (ev) {
+      if (ev.key === "Enter" && bestMatch) {
+        ev.preventDefault();
+        selectResult(bestMatch);
+      }
     });
 
     wrap.appendChild(el("div.search-box", {}, [icon("search", 16), input]));
@@ -339,7 +372,10 @@
   }
 
   function sliderRow(m, key, label, desc, min, max) {
-    var valueBox = el("div.slider-value", { text: Number(m.settings[key]).toFixed(2) });
+    var valueBox = el("button.slider-value", {
+      title: "Click to type an exact value",
+      text: Number(m.settings[key]).toFixed(2)
+    });
     var input = el("input.slider", {
       type: "range", min: min, max: max, step: "0.01",
       value: m.settings[key]
@@ -350,12 +386,47 @@
         "linear-gradient(to right, var(--slider-fill) 0%, var(--slider-fill) " + pct +
         "%, var(--slider-track) " + pct + "%, var(--slider-track) 100%)";
     }
-    input.addEventListener("input", function () {
-      m.settings[key] = parseFloat(input.value);
-      valueBox.textContent = m.settings[key].toFixed(2);
-      window.java_bridge_callback.updateModuleSetting(m.id, key, m.settings[key]);
+    function apply(value) {
+      m.settings[key] = value;
+      input.value = value;
+      valueBox.textContent = value.toFixed(2);
+      window.java_bridge_callback.updateModuleSetting(m.id, key, value);
       paint();
+    }
+    input.addEventListener("input", function () {
+      apply(parseFloat(input.value));
     });
+
+    // Click the value to type an exact, validated value.
+    valueBox.addEventListener("click", function () {
+      var editor = el("input.slider-value-input", {
+        type: "text",
+        value: m.settings[key].toFixed(2)
+      });
+      valueBox.parentNode.replaceChild(editor, valueBox);
+      editor.focus();
+      editor.select();
+
+      var done = false;
+      function commit(save) {
+        if (done) return;
+        done = true;
+        if (save) {
+          var num = parseFloat(editor.value);
+          if (!isNaN(num)) {
+            num = Math.min(max, Math.max(min, num));
+            apply(num);
+          }
+        }
+        if (editor.parentNode) editor.parentNode.replaceChild(valueBox, editor);
+      }
+      editor.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter") { ev.preventDefault(); commit(true); }
+        else if (ev.key === "Escape") { ev.preventDefault(); commit(false); }
+      });
+      editor.addEventListener("blur", function () { commit(true); });
+    });
+
     paint();
 
     return el("div.setting-row.slider-row", {}, [
@@ -654,6 +725,68 @@
     }
 
     return el("div.page", {}, [head, el("div.scroll-area", {}, [rows])]);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Brand / about page                                                  */
+  /* ------------------------------------------------------------------ */
+
+  function renderBrandPage() {
+    var discordUrl = "discord.gg/placeholder";
+
+    var discordBtn = el("button.discord-btn", {
+      title: "Copy Discord link",
+      onclick: function () {
+        var link = "https://" + discordUrl;
+        copyToClipboard(link);
+        showToast("Discord link copied to clipboard!");
+      }
+    }, [window.filledIcon("discord", 36)]);
+
+    return el("div.page.brand-page", {}, [
+      el("div.brand-stage", {}, [
+        el("img.brand-logo-xl", { src: "assets/logo.png", alt: "Calamity" }),
+        el("div.brand-page-title", { html: '<span>Calamity</span> <em>Client</em>' }),
+        el("div.brand-page-sub", { text: "Beta Version 0.0.1" }),
+        discordBtn
+      ])
+    ]);
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Toast + clipboard helpers                                           */
+  /* ------------------------------------------------------------------ */
+
+  function showToast(message) {
+    var existing = document.querySelector(".toast");
+    if (existing) existing.parentNode.removeChild(existing);
+    var toast = el("div.toast", {}, [el("span", { text: message })]);
+    document.body.appendChild(toast);
+    // Force a reflow so the transition runs from the initial state.
+    void toast.offsetWidth;
+    toast.classList.add("show");
+    setTimeout(function () {
+      toast.classList.remove("show");
+      setTimeout(function () {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 250);
+    }, 2200);
+  }
+  window.showToast = showToast;
+
+  function copyToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text);
+      return;
+    }
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch (e) {}
+    document.body.removeChild(ta);
   }
 
   /* ------------------------------------------------------------------ */
